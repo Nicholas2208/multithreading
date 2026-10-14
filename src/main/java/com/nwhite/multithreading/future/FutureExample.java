@@ -3,6 +3,10 @@ package com.nwhite.multithreading.future;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class FutureExample {
 
@@ -14,9 +18,37 @@ public class FutureExample {
         final int threads = 10;
         List<List<Long>> sublists = split(numbers, threads);
 
-        // TODO: make it work
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
 
-        return 0;
+        try {
+            List<Future<Long>> futures = new ArrayList<>(threads);
+
+            for (List<Long> sublist : sublists) {
+                final List<Long> part = sublist;
+                futures.add(executor.submit(() -> {
+                    long localSum = 0L;
+                    for (Long value : part) {
+                        localSum += value;
+                    }
+                    return localSum;
+                }));
+            }
+
+            long total = 0L;
+            for (Future<Long> future : futures) {
+                try {
+                    total += future.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while summing", e);
+                } catch (ExecutionException e) {
+                    throw new RuntimeException("Failed to compute sum", e.getCause());
+                }
+            }
+            return total;
+        } finally {
+            executor.shutdown();
+        }
     }
 
     private static List<List<Long>> split(List<Long> numbers, int parts) {
